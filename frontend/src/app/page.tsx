@@ -1,19 +1,19 @@
 'use client';
 
-import Chat from './components/chat';
+import { useRouter } from 'next/navigation';
+import { useEffect } from 'react';
 
-export default function HomePage() {
+export default function LandingPage() {
+  const router = useRouter();
+
+  useEffect(() => {
+    // If you prefer to redirect to /login immediately:
+    router.push('/login');
+  }, [router]);
+
   return (
-    <div className='h-full flex flex-col'>
-      {/* Channel Header */}
-      <div className='border-b p-3 font-bold text-lg'>
-        # Home Channel
-      </div>
-
-      {/* Chat Area */}
-      <div className='flex-1'>
-        <Chat channelId='home' />
-      </div>
+    <div className="h-screen flex items-center justify-center">
+      <h1 className="text-2xl">Welcome to University Connect!</h1>
     </div>
   );
 }

@@ -1,8 +1,8 @@
 'use client';
 
 import { useState } from 'react';
-import Sidebar from '../(components)/Sidebar';
-import Chat from '../(components)/Chat';
+import Sidebar from '../components/sidebar';
+import Chat from '../components/chat';
 
 export default function UniConPage() {
   const [selectedChannel, setSelectedChannel] = useState('General');

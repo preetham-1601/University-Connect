@@ -1,26 +1,23 @@
 import './globals.css';
+import { Inter } from 'next/font/google';
+
+// Example Google Font
+const inter = Inter({ subsets: ['latin'] });
 
 export const metadata = {
   title: 'University Connect',
-  description: 'Slack/Discord-like UI for campus',
+  description: 'A place for your universities'
 };
-
-import Sidebar from './components/Sidebar';
 
 export default function RootLayout({
   children,
 }: {
-  children: React.ReactNode
+  children: React.ReactNode;
 }) {
   return (
-    <html lang='en'>
-      <body className='h-screen w-screen flex overflow-hidden'>
-        {/* Gradient Sidebar */}
-        <Sidebar />
-        {/* Main content with semi-transparent background */}
-        <div className='flex-1' style={{ backgroundColor: 'rgba(172,241,255,0.5)' }}>
-          {children}
-        </div>
+    <html lang="en">
+      <body className={inter.className}>
+        {children}
       </body>
     </html>
   );
