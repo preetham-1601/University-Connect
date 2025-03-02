@@ -21,7 +21,7 @@ export default function LoginPage() {
         body: JSON.stringify({ email, password }),
       });
       const data = await res.json();
-      router.push('/home');
+      
       if (!res.ok) {
         setErrorMsg(data.error || 'Login failed');
         return;
@@ -31,7 +31,7 @@ export default function LoginPage() {
       // localStorage.setItem('token', data.token);
 
       // Redirect to home
-      
+    router.push('/home');
     } catch (err: unknown) {
       if (err instanceof Error) {
         setErrorMsg(err.message);
