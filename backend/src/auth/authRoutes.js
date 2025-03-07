@@ -1,8 +1,10 @@
+// /backend/src/auth/authRoutes.js
 const express = require("express");
-const { login } = require("./authController");
+const { signupUser, loginUser } = require("./authController");
 
 const router = express.Router();
 
-router.post("/login", login);
+router.post("/signup", signupUser);
+router.post("/login", loginUser);
 
 module.exports = router;
