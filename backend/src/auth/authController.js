@@ -1,34 +1,44 @@
 // /backend/src/auth/authController.js
 const supabase = require("../supabaseClient");
 
-// SIGNUP (with .edu domain check + email verification)
+// SIGNUP (with .edu check, confirm password, storing minimal user_metadata)
 exports.signupUser = async (req, res) => {
   try {
-    const { email, password } = req.body;
+    const { email, password, confirmPassword, username, universityName } = req.body;
 
-    // (A) Check .edu domain
+    // .edu domain check
     const domain = email.split("@")[1] || "";
     if (!domain.endsWith("edu")) {
       return res.status(400).json({ error: "Only .edu emails allowed" });
     }
 
-    // (B) Sign up user (Supabase sends verification email if “Confirm email” is on)
-    const { data, error } = await supabase.auth.signUp({
+    // Confirm password
+    if (password !== confirmPassword) {
+      return res.status(400).json({ error: "Passwords do not match" });
+    }
+
+    // Sign up user with user_metadata
+    const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
       email,
       password,
       options: {
-        emailRedirectTo: "http://localhost:3000" 
-        // or your real domain, e.g. "https://myapp.com"
-      },
+        emailRedirectTo: "http://localhost:3000/onboarding", 
+        data: {
+          username,
+          universityName,
+          // You can add avatarURL, onboarded: false, interests, etc. if you want
+        }
+      }
     });
 
-    if (error) {
-      return res.status(400).json({ error: error.message });
+    if (signUpError) {
+      return res.status(400).json({ error: signUpError.message });
     }
 
+    // Because “Confirm email” is enabled, user must verify before login
     return res.json({
-      message: "Signup successful. Please check your .edu email to verify your account.",
-      user: data.user,
+      message: "Signup successful! Check your .edu email to verify.",
+      user: signUpData.user
     });
   } catch (err) {
     console.error("Signup error:", err);
@@ -36,32 +46,33 @@ exports.signupUser = async (req, res) => {
   }
 };
 
-// LOGIN (with .edu domain check)
+// LOGIN (returns token if verified)
 exports.loginUser = async (req, res) => {
   try {
+    console.log("Request body:", req.body);
     const { email, password } = req.body;
 
-    // (A) Check .edu domain
+    // .edu check
     const domain = email.split("@")[1] || "";
     if (!domain.endsWith("edu")) {
       return res.status(400).json({ error: "Only .edu emails allowed" });
     }
 
-    // (B) Sign in with password
-    const { data, error } = await supabase.auth.signInWithPassword({
-      email,
-      password
-    });
-
+    // signInWithPassword
+    const { data, error } = await supabase.auth.signInWithPassword({ email, password });
     if (error) {
       return res.status(401).json({ error: error.message || "Invalid credentials" });
     }
 
-    // data.session.access_token is your JWT
+    // Return token + user
+    if (!data.session) {
+      return res.status(401).json({ error: "User not verified or no session" });
+    }
+
     return res.json({
       message: "Login successful",
       token: data.session.access_token,
-      user: data.user,
+      user: data.user
     });
   } catch (err) {
     console.error("Login error:", err);

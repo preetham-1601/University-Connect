@@ -10,40 +10,41 @@ export default function LoginPage() {
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
 
-  // OPTIONAL: .edu check on the front end
-  function isEduEmail(email) {
-    return email.endsWith(".edu");
-  }
-
+  
   const handleLogin = async (e) => {
     e.preventDefault();
     setError("");
-
-    // Front-end .edu check
-    if (!isEduEmail(email)) {
+  
+    if (!email.endsWith("edu")) {
       setError("Only .edu emails allowed");
       return;
     }
-
+  
     try {
-      const data = await login(email, password);
+      // Pass an object with email and password
+      const data = await login({ email, password });
       if (data.error) {
         setError(data.error);
       } else {
-        // store token
         localStorage.setItem("token", data.token);
-        // redirect
-        router.push("/home");
+  
+        const onboarded = data.user?.user_metadata?.onboarded;
+        if (!onboarded) {
+          router.push("/onboarding");
+        } else {
+          router.push("/home");
+        }
       }
     } catch (err) {
       setError("Login failed");
     }
   };
+  
 
   return (
     <div className="flex h-screen">
       {/* Left half */}
-      <div className="w-1/2 bg-gradient-to-br from-blue-600 to-blue-800 text-white flex flex-col justify-center items-center">
+      <div className="w-1/2 bg-gradient-to-br from-[#3192A5] to-[#296485] text-white flex flex-col justify-center items-center">
         <h1 className="text-4xl font-bold">Log In</h1>
         <p className="mt-2">.edu emails only</p>
       </div>
