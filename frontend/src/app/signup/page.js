@@ -1,17 +1,14 @@
-// /frontend/src/app/signup/page.js
 "use client";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { signup } from "@/utils/api";
 
-export default function SignupPage() {
+export default function Signup() {
   const router = useRouter();
   const [formData, setFormData] = useState({
     email: "",
     password: "",
     confirmPassword: "",
-    username: "",
-    universityName: ""
   });
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
@@ -38,7 +35,7 @@ export default function SignupPage() {
     if (data.error) {
       setError(data.error);
     } else {
-      setMessage(data.message || "Signup successful");
+      setMessage(data.message || "Signup successful. Please verify your email.");
     }
   }
 
@@ -47,13 +44,11 @@ export default function SignupPage() {
       <div className="w-1/2 bg-blue-600 text-white flex flex-col justify-center items-center">
         <h1 className="text-4xl font-bold">Sign Up</h1>
       </div>
-
       <div className="w-1/2 flex flex-col justify-center items-center">
         <form onSubmit={handleSignup} className="w-80 p-6 shadow-lg rounded-lg bg-white">
           <h2 className="text-2xl font-bold mb-4">Create Account</h2>
           {error && <p className="text-red-500 mb-2">{error}</p>}
           {message && <p className="text-green-500 mb-2">{message}</p>}
-
           <input
             type="email"
             name="email"
@@ -78,32 +73,11 @@ export default function SignupPage() {
             value={formData.confirmPassword}
             onChange={handleChange}
           />
-          <input
-            type="text"
-            name="username"
-            placeholder="Username"
-            className="w-full p-2 border mb-2"
-            value={formData.username}
-            onChange={handleChange}
-          />
-          <input
-            type="text"
-            name="universityName"
-            placeholder="University Name"
-            className="w-full p-2 border mb-2"
-            value={formData.universityName}
-            onChange={handleChange}
-          />
-
-          <button className="w-full bg-blue-500 text-white py-2 rounded mb-2">
-            Sign Up
-          </button>
+        
+          <button className="w-full bg-blue-500 text-white py-2 rounded mb-2">Sign Up</button>
           <p className="text-sm text-center">
             Already have an account?{" "}
-            <span
-              onClick={() => router.push("/login")}
-              className="text-blue-500 cursor-pointer"
-            >
+            <span onClick={() => router.push("/login")} className="text-blue-500 cursor-pointer">
               Log in
             </span>
           </p>

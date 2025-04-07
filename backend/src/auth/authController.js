@@ -1,44 +1,36 @@
-// /backend/src/auth/authController.js
+// backend/src/auth/authController.js
 const supabase = require("../supabaseClient");
 
-// SIGNUP (with .edu check, confirm password, storing minimal user_metadata)
 exports.signupUser = async (req, res) => {
   try {
-    const { email, password, confirmPassword, username, universityName } = req.body;
-
-    // .edu domain check
-    const domain = email.split("@")[1] || "";
-    if (!domain.endsWith("edu")) {
-      return res.status(400).json({ error: "Only .edu emails allowed" });
+    const { email, password, confirmPassword } = req.body;
+    
+    if (!email || !password || !confirmPassword) {
+      return res.status(400).json({ error: "Missing required fields" });
     }
-
-    // Confirm password
     if (password !== confirmPassword) {
       return res.status(400).json({ error: "Passwords do not match" });
     }
 
-    // Sign up user with user_metadata
-    const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
-      email,
-      password,
-      options: {
-        emailRedirectTo: "http://localhost:3000/onboarding", 
-        data: {
-          username,
-          universityName,
-          // You can add avatarURL, onboarded: false, interests, etc. if you want
-        }
-      }
-    });
-
-    if (signUpError) {
-      return res.status(400).json({ error: signUpError.message });
+    // Create the user via Supabase Auth
+    const { data, error } = await supabase.auth.signUp({ email, password });
+    if (error) {
+      console.error("Supabase signUp error:", error);
+      return res.status(400).json({ error: error.message });
     }
 
-    // Because “Confirm email” is enabled, user must verify before login
+    // Insert profile record (only email for now)
+    const { data: profileData, error: profileError } = await supabase
+      .from("profiles")
+      .insert([{ id: data.user.id, email: data.user.email }]);
+    if (profileError) {
+      console.error("Profile insertion error:", profileError);
+      return res.status(400).json({ error: profileError.message });
+    }
+
     return res.json({
-      message: "Signup successful! Check your .edu email to verify.",
-      user: signUpData.user
+      message: "Signup successful! Please verify your email.",
+      user: data.user,
     });
   } catch (err) {
     console.error("Signup error:", err);
@@ -46,34 +38,20 @@ exports.signupUser = async (req, res) => {
   }
 };
 
-// LOGIN (returns token if verified)
+
 exports.loginUser = async (req, res) => {
   try {
-    console.log("Request body:", req.body);
     const { email, password } = req.body;
+    if (!email || !password)
+      return res.status(400).json({ error: "Missing email or password" });
 
-    // .edu check
-    const domain = email.split("@")[1] || "";
-    if (!domain.endsWith("edu")) {
-      return res.status(400).json({ error: "Only .edu emails allowed" });
-    }
-
-    // signInWithPassword
     const { data, error } = await supabase.auth.signInWithPassword({ email, password });
-    if (error) {
-      return res.status(401).json({ error: error.message || "Invalid credentials" });
-    }
-
-    // Return token + user
-    if (!data.session) {
+    if (error)
+      return res.status(401).json({ error: error.message });
+    if (!data.session)
       return res.status(401).json({ error: "User not verified or no session" });
-    }
 
-    return res.json({
-      message: "Login successful",
-      token: data.session.access_token,
-      user: data.user
-    });
+    return res.json({ message: "Login successful", token: data.session.access_token, user: data.user });
   } catch (err) {
     console.error("Login error:", err);
     return res.status(500).json({ error: "Server error" });

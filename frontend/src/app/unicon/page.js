@@ -1,101 +1,121 @@
 "use client";
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
+import { getProfile, getUsers, getMessages, sendMessage } from "@/utils/api";
 
-export default function UniConPage() {
-  // Categories in your university connect
-  const categories = ["Clubs", "Events", "Startups", "Projects", "Dorms"];
+export default function UniconPage() {
+  const router = useRouter();
+  const [currentUser, setCurrentUser] = useState(null);
+  const [allUsers, setAllUsers] = useState([]);
+  const [selectedUser, setSelectedUser] = useState(null);
+  const [messages, setMessages] = useState([]);
+  const [chatInput, setChatInput] = useState("");
 
-  // Track the currently selected category
-  const [selectedCategory, setSelectedCategory] = useState("Clubs");
-
-  // Store messages by category (local state for demo)
-  const [messagesByCategory, setMessagesByCategory] = useState({
-    Clubs: [],
-    Events: [],
-    Startups: [],
-    Projects: [],
-    Dorms: [],
-  });
-
-  // Track input for sending new message
-  const [input, setInput] = useState("");
-
-  // Handle category click in the sidebar
-  function handleCategorySelect(category) {
-    setSelectedCategory(category);
-  }
-
-  // Send a message to the selected category
-  function handleSend() {
-    if (!input.trim()) return;
-    setMessagesByCategory((prev) => {
-      // Copy existing messages for the current category
-      const newMessages = [...prev[selectedCategory], input];
-      // Return updated state with new message appended
-      return {
-        ...prev,
-        [selectedCategory]: newMessages,
-      };
+  // On component mount, fetch current user profile and all user profiles.
+  useEffect(() => {
+    const token = localStorage.getItem("token");
+    if (!token) {
+      router.push("/login");
+      return;
+    }
+    // Get current user profile
+    getProfile(token).then((res) => {
+      if (res && res.user) {
+        setCurrentUser(res.user);
+      }
     });
-    setInput("");
+    // Get all user profiles from the profiles table
+    getUsers().then((res) => {
+      if (res && res.users) {
+        setAllUsers(res.users);
+      }
+    });
+  }, [router]);
+
+  // Whenever the selected user changes, fetch the messages between currentUser and selectedUser.
+  useEffect(() => {
+    if (currentUser && selectedUser) {
+      getMessages(currentUser.id, selectedUser.id).then((res) => {
+        if (!res.error) {
+          setMessages(res.messages);
+        }
+      });
+    }
+  }, [currentUser, selectedUser]);
+  
+
+  // Send a new message
+  async function handleSend() {
+    if (!chatInput.trim() || !currentUser || !selectedUser) return;
+    const res = await sendMessage({
+      sender_id: currentUser.id,
+      receiver_id: selectedUser.id,
+      content: chatInput,
+    });
+    if (res && !res.error) {
+      setMessages((prevMessages) => [...prevMessages, res.newMessage]);
+      setChatInput("");
+    }
   }
 
-  // Get messages for the currently selected category
-  const messages = messagesByCategory[selectedCategory];
+  // Logout by clearing token and redirecting to login
+  function handleLogout() {
+    localStorage.removeItem("token");
+    router.push("/login");
+  }
 
   return (
-    <div className="h-screen flex">
-      {/* Sidebar with categories */}
-      <div className="w-64 bg-gradient-to-br from-[#3192A5] to-[#296485] text-white p-4">
-        <h2 className="text-xl font-bold mb-4">UniCon Channels</h2>
-        <ul className="space-y-2">
-          {categories.map((cat) => (
-            <li
-              key={cat}
-              className={`cursor-pointer p-2 rounded hover:bg-[#296485]/80 ${
-                selectedCategory === cat ? "bg-[#296485]/80" : ""
-              }`}
-              onClick={() => handleCategorySelect(cat)}
+    <div className="flex h-screen">
+      {/* Left Panel: List of available users (excluding the current user) */}
+      <div className="w-1/4 bg-gradient-to-b from-[#3192A5] to-[#296485] text-white p-4">
+        <h2 className="text-xl font-bold mb-4">Available Users</h2>
+        {allUsers
+          .filter((u) => currentUser && u.id !== currentUser.id)
+          .map((user) => (
+            <div
+              key={user.id}
+              className={`cursor-pointer hover:underline mb-1 ${selectedUser && selectedUser.id === user.id ? "underline" : ""}`}
+              onClick={() => setSelectedUser(user)}
             >
-              #{cat}
-            </li>
+              {user.email}
+            </div>
           ))}
-        </ul>
+        <p className="mt-4 text-sm">Click a user to start chatting</p>
       </div>
 
-      {/* Main Chat Area */}
-      <div className="flex-1 flex flex-col bg-[#ACF1FF] bg-opacity-50">
-        {/* Header */}
-        <div className="border-b p-3 font-bold text-xl">
-          #{selectedCategory}
-        </div>
-
-        {/* Messages List */}
-        <div className="flex-1 overflow-y-auto p-4 space-y-2">
+      {/* Right Panel: Chat Interface */}
+      <div className="w-3/4 flex flex-col">
+        <nav className="bg-blue-600 text-white p-4 flex justify-between items-center">
+          <h1 className="text-xl font-bold">
+            {selectedUser ? `Chat with ${selectedUser.email}` : "Select a user to chat"}
+          </h1>
+          <button onClick={handleLogout} className="bg-white text-blue-600 px-3 py-1 rounded">
+            Logout
+          </button>
+        </nav>
+        <div className="flex-1 bg-blue-50 p-4 overflow-y-auto">
           {messages.length === 0 ? (
-            <p className="text-gray-500">No messages yet in #{selectedCategory}...</p>
+            <p>No messages yet.</p>
           ) : (
-            messages.map((msg, idx) => (
-              <div key={idx} className="text-sm bg-white p-2 rounded shadow">
-                <span className="font-bold mr-2">User:</span>
-                {msg}
+            messages.map((msg) => (
+              <div key={msg.id} className="mb-2">
+                <span className="font-bold">
+                  {msg.sender_id === currentUser?.id ? "You" : selectedUser?.email}:
+                </span>{" "}
+                {msg.content}
               </div>
             ))
           )}
         </div>
-
-        {/* Input Box */}
-        <div className="p-3 border-t flex">
+        <div className="p-4 bg-white flex">
           <input
-            className="flex-1 border rounded px-2 py-1 text-sm"
-            value={input}
-            onChange={(e) => setInput(e.target.value)}
-            placeholder={`Message #${selectedCategory}`}
+            type="text"
+            placeholder="Type your message..."
+            className="flex-1 border p-2"
+            value={chatInput}
+            onChange={(e) => setChatInput(e.target.value)}
           />
-          <button
-            onClick={handleSend}
-            className="ml-2 bg-blue-500 text-white px-4 py-2 rounded text-sm"
-          >
+          <button onClick={handleSend} className="bg-blue-500 text-white px-4 py-2 ml-2">
             Send
           </button>
         </div>

@@ -1,12 +1,11 @@
-// /frontend/src/utils/api.js
 const API_URL = "http://localhost:5000/api";
 
 // SIGNUP
-export const signup = async ({ email, password, confirmPassword, username, universityName }) => {
+export const signup = async ({ email, password, confirmPassword }) => {
   const res = await fetch(`${API_URL}/auth/signup`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ email, password, confirmPassword, username, universityName })
+    body: JSON.stringify({ email, password, confirmPassword })
   });
   return res.json();
 };
@@ -16,23 +15,45 @@ export const login = async ({ email, password }) => {
   const res = await fetch(`${API_URL}/auth/login`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ email, password})
+    body: JSON.stringify({ email, password })
   });
   return res.json();
 };
 
-// GET PROFILE
+// GET PROFILE (uses token query parameter)
 export const getProfile = async (token) => {
   const res = await fetch(`${API_URL}/profile?token=${token}`);
   return res.json();
 };
 
 // UPDATE PROFILE
-export const updateProfile = async ({ token, fullName, bio, avatarURL, interests }) => {
+export const updateProfile = async ({ token, fullName, avatarURL }) => {
   const res = await fetch(`${API_URL}/profile`, {
     method: "PUT",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ token, fullName, bio, avatarURL, interests })
+    body: JSON.stringify({ token, fullName, avatarURL })
+  });
+  return res.json();
+};
+
+// GET ALL USERS (profiles)
+export const getUsers = async () => {
+  const res = await fetch(`${API_URL}/users`);
+  return res.json();
+};
+
+// GET MESSAGES for direct messaging
+export const getMessages = async (user1, user2) => {
+  const res = await fetch(`${API_URL}/messages/between/${user1}/${user2}`);
+  return res.json();
+};
+
+// SEND MESSAGE for direct messaging
+export const sendMessage = async ({ sender_id, receiver_id, content }) => {
+  const res = await fetch(`${API_URL}/messages/send`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ sender_id, receiver_id, content })
   });
   return res.json();
 };

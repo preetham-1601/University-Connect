@@ -1,4 +1,3 @@
-// /frontend/src/app/profile/page.js
 "use client";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
@@ -6,11 +5,10 @@ import { getProfile, updateProfile } from "@/utils/api";
 
 export default function ProfilePage() {
   const router = useRouter();
-  const [user, setUser] = useState(null);
   const [token, setToken] = useState("");
+  const [user, setUser] = useState(null);
   const [error, setError] = useState("");
 
-  // local fields
   const [fullName, setFullName] = useState("");
   const [bio, setBio] = useState("");
   const [avatarURL, setAvatarURL] = useState("");
@@ -23,14 +21,12 @@ export default function ProfilePage() {
       return;
     }
     setToken(t);
-
-    // fetch user profile
     getProfile(t).then((res) => {
       if (res.error) {
         setError(res.error);
       } else {
         setUser(res.user);
-        const meta = res.user.user_metadata || {};
+        const meta = res.user?.user_metadata || {};
         setFullName(meta.fullName || "");
         setBio(meta.bio || "");
         setAvatarURL(meta.avatarURL || "");
@@ -39,14 +35,13 @@ export default function ProfilePage() {
     });
   }, [router]);
 
-  function handleSave() {
-    updateProfile({ token, fullName, bio, avatarURL, interests }).then((res) => {
-      if (res.error) {
-        setError(res.error);
-      } else {
-        router.push("/home");
-      }
-    });
+  async function handleSave() {
+    const res = await updateProfile({ token, fullName, avatarURL, bio, interests });
+    if (res.error) {
+      setError(res.error);
+    } else {
+      router.push("/home");
+    }
   }
 
   if (!user && !error) return <p>Loading profile...</p>;
@@ -56,39 +51,31 @@ export default function ProfilePage() {
       <div className="max-w-md mx-auto bg-white p-4 shadow rounded">
         <h2 className="text-2xl font-bold mb-4">Profile</h2>
         {error && <p className="text-red-500 mb-2">{error}</p>}
-
         <label className="block mb-1">Full Name</label>
         <input
           className="border p-2 w-full mb-2"
           value={fullName}
           onChange={(e) => setFullName(e.target.value)}
         />
-
         <label className="block mb-1">Avatar URL</label>
         <input
           className="border p-2 w-full mb-2"
           value={avatarURL}
           onChange={(e) => setAvatarURL(e.target.value)}
         />
-
         <label className="block mb-1">Bio</label>
         <textarea
           className="border p-2 w-full mb-2"
           value={bio}
           onChange={(e) => setBio(e.target.value)}
         />
-
-        <label className="block mb-1">Interests (comma separated?)</label>
+        <label className="block mb-1">Interests (comma separated)</label>
         <input
           className="border p-2 w-full mb-2"
           value={interests.join(",")}
           onChange={(e) => setInterests(e.target.value.split(","))}
         />
-
-        <button
-          onClick={handleSave}
-          className="bg-blue-500 text-white px-4 py-2 rounded"
-        >
+        <button onClick={handleSave} className="bg-blue-500 text-white px-4 py-2 rounded">
           Save
         </button>
       </div>
