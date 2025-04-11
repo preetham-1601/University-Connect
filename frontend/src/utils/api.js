@@ -57,3 +57,4 @@ export const sendMessage = async ({ sender_id, receiver_id, content }) => {
   });
   return res.json();
 };
+
