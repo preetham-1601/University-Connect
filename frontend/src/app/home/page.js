@@ -1,7 +1,9 @@
+// app/home/page.js
 "use client";
-import { useEffect, useState } from "react";
+import React, { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { getProfile } from "@/utils/api";
+import Navbar from "@/components/Navbar";
 
 export default function HomePage() {
   const router = useRouter();
@@ -15,9 +17,7 @@ export default function HomePage() {
       return;
     }
     getProfile(token).then((res) => {
-      if (!res.error) {
-        setCurrentUser(res.user);
-      }
+      if (!res.error) setCurrentUser(res.user);
     });
     // Simulate a newsletter feed
     setFeed([
@@ -27,27 +27,18 @@ export default function HomePage() {
   }, [router]);
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <nav className="bg-blue-600 text-white p-4 flex justify-between items-center">
-        <div className="flex items-center">
-          <h1 className="text-xl font-bold">
-            Welcome, {currentUser ? currentUser.email : "User"}
-          </h1>
-          <button onClick={() => router.push("/profile")} className="ml-4">
-            <img src="/profile-icon.png" alt="Profile" className="w-8 h-8 rounded-full" />
-          </button>
+    <div className="flex h-screen">
+      <Navbar />
+      <div className="flex-1 bg-gray-50">
+        <div className="p-4">
+          <h1 className="text-3xl font-bold">Home Feed & Search</h1>
+          {feed.map((item) => (
+            <div key={item.id} className="bg-white shadow rounded p-4 mb-4">
+              <h2 className="text-2xl font-bold mb-2">{item.title}</h2>
+              <p>{item.content}</p>
+            </div>
+          ))}
         </div>
-        <button onClick={() => router.push("/unicon")} className="bg-white text-blue-600 px-3 py-1 rounded">
-          Go to Unicon
-        </button>
-      </nav>
-      <div className="p-4">
-        {feed.map((item) => (
-          <div key={item.id} className="bg-white shadow rounded p-4 mb-4">
-            <h2 className="text-2xl font-bold mb-2">{item.title}</h2>
-            <p>{item.content}</p>
-          </div>
-        ))}
       </div>
     </div>
   );

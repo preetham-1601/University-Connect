@@ -2,6 +2,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { getProfile, updateProfile } from "@/utils/api";
+import Navbar from "@/components/Navbar";
 
 export default function ProfilePage() {
   const router = useRouter();
@@ -46,7 +47,8 @@ export default function ProfilePage() {
 
   if (!user && !error) return <p>Loading profile...</p>;
 
-  return (
+  return (<div className="flex h-screen">
+        <Navbar />
     <div className="min-h-screen bg-blue-50 p-6">
       <div className="max-w-md mx-auto bg-white p-4 shadow rounded">
         <h2 className="text-2xl font-bold mb-4">Profile</h2>
@@ -79,6 +81,6 @@ export default function ProfilePage() {
           Save
         </button>
       </div>
-    </div>
+    </div></div>
   );
 }
