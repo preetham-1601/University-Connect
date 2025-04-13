@@ -12,7 +12,7 @@ export default function Navbar() {
   const navItems = [
     { route: "/home", icon: <FiHome />, label: "Home" },
     { route: "/profile", icon: <FiUser />, label: "Profile" },
-    { route: "/dms", icon: <FiMessageCircle />, label: "DMs" },
+    { route: "/unicon", icon: <FiMessageCircle />, label: "DMs" },
     { route: "/channels", icon: <FiMessageCircle />, label: "Channels" },
     { route: "/explore", icon: <FiPlus />, label: "Explore" },
   ];

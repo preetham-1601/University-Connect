@@ -1,4 +1,4 @@
-const API_URL = "http://localhost:5000/api";
+const API_URL = process.env.NEXT_PUBLIC_API_URL;
 
 // SIGNUP
 export const signup = async ({ email, password, confirmPassword }) => {
@@ -58,3 +58,34 @@ export const sendMessage = async ({ sender_id, receiver_id, content }) => {
   return res.json();
 };
 
+// GET ALL CHANNELS
+export const getChannels = async () => {
+  const res = await fetch(`${API_URL}/channels`);
+  return res.json();
+};
+
+// CREATE A NEW CHANNEL
+export const createChannel = async ({ name, description }) => {
+  const res = await fetch(`${API_URL}/channels`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ name, description })
+  });
+  return res.json();
+};
+
+// GET CHANNEL MESSAGES
+export const getChannelMessages = async (channelId) => {
+  const res = await fetch(`${API_URL}/channels/messages/${channelId}`);
+  return res.json();
+};
+
+// SEND A CHANNEL MESSAGE
+export const sendChannelMessage = async ({ channel_id, sender_id, content }) => {
+  const res = await fetch(`${API_URL}/channels/messages`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ channel_id, sender_id, content })
+  });
+  return res.json();
+};
