@@ -1,153 +1,229 @@
-// app/unicon/page.js
+// frontend/src/app/unicon/page.js
 "use client";
 import React, { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { getUsers, getMessages, sendMessage } from "@/utils/api";
+import {
+  getUsers,
+  getMessages,
+  sendMessage,
+  getProfile,
+  getAcceptedFollowRequests,
+} from "@/utils/api";
 import { supabase } from "@/utils/supabaseClient";
 import Navbar from "@/components/Navbar";
 
 export default function UniconPage() {
   const router = useRouter();
-  const [currentUser, setCurrentUser] = useState(null);
-  const [allUsers, setAllUsers] = useState([]);
-  const [selectedUser, setSelectedUser] = useState(null);
-  const [messages, setMessages] = useState([]);
-  const [chatInput, setChatInput] = useState("");
 
+  // User & connections
+  const [currentUser, setCurrentUser] = useState(null);
+  const [allUsers, setAllUsers]   = useState([]);
+  const [acceptedConnections, setAcceptedConnections] = useState([]);
+
+  // DM state
+  const [selectedUser, setSelectedUser] = useState(null);
+  const [messages, setMessages]         = useState([]);
+  const [chatInput, setChatInput]       = useState("");
+  const [loading, setLoading]           = useState(true);
+  const [error, setError]               = useState("");
+
+  // 1️⃣ On mount: load profile, users, accepted connections
   useEffect(() => {
     const token = localStorage.getItem("token");
     if (!token) {
       router.push("/login");
       return;
     }
-    fetch(`http://localhost:5000/api/profile?token=${token}`)
-      .then((res) => res.json())
-      .then((data) => {
-        if (data.user) setCurrentUser(data.user);
-      });
-    getUsers().then((data) => {
-      if (!data.error) setAllUsers(data.users);
-    });
+
+    // Fetch current user
+    getProfile(token)
+      .then((res) => {
+        if (res.user) {
+          setCurrentUser(res.user);
+          return res.user.id;
+        }
+        throw new Error("No user");
+      })
+      .then((userId) => {
+        // Fetch accepted connections
+        return getAcceptedFollowRequests(userId);
+      })
+      .then((res) => {
+        if (res.accepted) {
+          setAcceptedConnections(res.accepted);
+        }
+      })
+      .catch((err) => setError(err.message));
+
+    // Fetch all users
+    getUsers()
+      .then((res) => {
+        if (res.users) setAllUsers(res.users);
+      })
+      .catch((err) => setError(err.message))
+      .finally(() => setLoading(false));
   }, [router]);
 
+  // 2️⃣ Build DM list: only connected users (exclude self)
+  const filteredDMUsers = allUsers.filter((user) =>
+    currentUser &&
+    user.id !== currentUser.id &&
+    acceptedConnections.includes(user.id)
+  );
+
+  // 3️⃣ Fetch messages when you select a user
   useEffect(() => {
     if (currentUser && selectedUser) {
-      getMessages(currentUser.id, selectedUser.id).then((res) => {
-        if (!res.error) {
-          setMessages(res.messages);
-        }
-      });
+      getMessages(currentUser.id, selectedUser.id)
+        .then((res) => {
+          if (!res.error) setMessages(res.messages);
+          else setError(res.error);
+        })
+        .catch((err) => setError(err.message));
     }
   }, [currentUser, selectedUser]);
 
+  // 4️⃣ Real‑time subscription
   useEffect(() => {
     if (!currentUser || !selectedUser) return;
-    const subscription = supabase
-      .channel("realtime-messages")
+    const sub = supabase
+      .channel("dm-messages")
       .on(
         "postgres_changes",
         { event: "INSERT", schema: "public", table: "messages" },
-        (payload) => {
-          const newMessage = payload.new;
+        ({ new: msg }) => {
           if (
-            (newMessage.sender_id === selectedUser.id && newMessage.receiver_id === currentUser.id) ||
-            (newMessage.sender_id === currentUser.id && newMessage.receiver_id === selectedUser.id)
+            (msg.sender_id === currentUser.id && msg.receiver_id === selectedUser.id) ||
+            (msg.sender_id === selectedUser.id && msg.receiver_id === currentUser.id)
           ) {
-            setMessages((prev) => [...prev, newMessage]);
+            setMessages((m) => [...m, msg]);
           }
         }
       )
       .subscribe();
-    return () => {
-      supabase.removeChannel(subscription);
-    };
+    return () => supabase.removeChannel(sub);
   }, [currentUser, selectedUser]);
 
+  // 5️⃣ Send message
   async function handleSend() {
     if (!chatInput.trim() || !currentUser || !selectedUser) return;
-    const contentToSend = chatInput;
+    const content = chatInput;
     setChatInput("");
-    const tempMessage = {
-      id: `temp-${Date.now()}`,
+    // Optimistic UI
+    const temp = {
+      id: `tmp-${Date.now()}`,
       sender_id: currentUser.id,
       receiver_id: selectedUser.id,
-      content: contentToSend,
+      content,
       created_at: new Date().toISOString(),
     };
-    setMessages((prev) => [...prev, tempMessage]);
+    setMessages((m) => [...m, temp]);
+
     const res = await sendMessage({
       sender_id: currentUser.id,
       receiver_id: selectedUser.id,
-      content: contentToSend,
+      content,
     });
     if (res.error) {
-      setMessages((prev) => prev.filter((msg) => msg.id !== tempMessage.id));
-      alert("Error sending message: " + res.error);
+      setMessages((m) => m.filter((x) => x.id !== temp.id));
+      alert("Send failed: " + res.error);
     }
+  }
+
+  if (loading) {
+    return (
+      <div className="flex h-screen items-center justify-center">
+        <p className="text-xl">Loading…</p>
+      </div>
+    );
   }
 
   return (
     <div className="flex h-screen">
+      {/* Left Navbar */}
       <Navbar />
-      <div className="w-64 bg-gray-200 p-4 border-r border-gray-300 overflow-y-auto">
-        <h2 className="text-lg font-bold mb-4 text-gray-800">Direct Messages</h2>
-        {allUsers
-          .filter((u) => currentUser && u.id !== currentUser.id)
-          .map((user) => (
+
+      {/* Middle: DM list */}
+      <div className="w-64 bg-gray-100 p-4 border-r overflow-y-auto">
+        <h2 className="text-lg font-bold mb-4">Direct Messages</h2>
+        {filteredDMUsers.length === 0 ? (
+          <p className="text-gray-600 text-sm">
+            No connections yet. Make a connection to chat.
+          </p>
+        ) : (
+          filteredDMUsers.map((u) => (
             <div
-              key={user.id}
-              className={`p-2 mb-2 rounded cursor-pointer transition-colors hover:bg-gray-300 ${
-                selectedUser?.id === user.id ? "bg-gray-300" : "bg-white"
+              key={u.id}
+              onClick={() => {
+                setSelectedUser(u);
+                setMessages([]);
+              }}
+              className={`p-2 mb-2 rounded cursor-pointer hover:bg-gray-200 ${
+                selectedUser?.id === u.id ? "bg-gray-300" : "bg-white"
               }`}
-              onClick={() => setSelectedUser(user)}
             >
-              <span className="font-semibold text-gray-900">{user.email}</span>
+              {u.email}
             </div>
-          ))}
-        <p className="mt-4 text-sm text-gray-600">
-          Click a user to start chatting
-        </p>
+          ))
+        )}
       </div>
+
+      {/* Right: Chat window */}
       <div className="flex-1 flex flex-col bg-blue-50">
-        <header
-          className="h-14 flex items-center px-4 bg-blue-600 text-white"
-        >
-          {selectedUser ? (
-            <h1 className="text-xl font-bold">Chat with {selectedUser.email}</h1>
-          ) : (
-            <h1 className="text-xl font-bold">Select a user to chat</h1>
-          )}
+        <header className="h-14 bg-blue-600 text-white px-4 flex items-center">
+          <h1 className="text-xl font-bold">
+            {selectedUser ? `Chat with ${selectedUser.email}` : "Select a chat"}
+          </h1>
         </header>
         <div className="flex-1 p-4 overflow-y-auto space-y-2">
           {selectedUser ? (
             messages.length === 0 ? (
               <p className="text-gray-600">No messages yet.</p>
             ) : (
-              messages.map((msg) => (
-                <div key={msg.id} className={`flex ${msg.sender_id === currentUser?.id ? "justify-end" : "justify-start"}`}>
-                  <div className={`max-w-xs p-3 rounded-xl shadow ${msg.sender_id === currentUser?.id ? "bg-blue-500 text-white rounded-br-none" : "bg-gray-200 text-gray-800 rounded-bl-none"}`}>
-                    {msg.content}
+              messages.map((msg) => {
+                const mine = msg.sender_id === currentUser.id;
+                const sender = allUsers.find((x) => x.id === msg.sender_id);
+                return (
+                  <div
+                    key={msg.id}
+                    className={`flex ${mine ? "justify-end" : "justify-start"}`}
+                  >
+                    <div className="max-w-xs">
+                      {!mine && (
+                        <div className="text-xs text-gray-600 mb-1">
+                          {sender?.email || "Unknown"}
+                        </div>
+                      )}
+                      <div
+                        className={`p-3 rounded-xl shadow ${
+                          mine
+                            ? "bg-blue-500 text-white rounded-br-none"
+                            : "bg-gray-200 text-gray-800 rounded-bl-none"
+                        }`}
+                      >
+                        {msg.content}
+                      </div>
+                    </div>
                   </div>
-                </div>
-              ))
+                );
+              })
             )
           ) : (
-            <p className="text-gray-600">Select a user from the list.</p>
+            <p className="text-gray-600">Select a user to start chatting.</p>
           )}
         </div>
         <div className="h-14 flex items-center px-4 bg-white border-t">
           <input
-            type="text"
-            placeholder="Type your message..."
-            className="flex-1 border p-2 rounded mr-2"
             value={chatInput}
             onChange={(e) => setChatInput(e.target.value)}
             disabled={!selectedUser}
+            placeholder="Type..."
+            className="flex-1 border p-2 rounded mr-2"
           />
           <button
             onClick={handleSend}
             disabled={!selectedUser}
-            className="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600 disabled:opacity-50 transition-colors"
+            className="bg-blue-500 text-white px-4 py-2 rounded disabled:opacity-50"
           >
             Send
           </button>

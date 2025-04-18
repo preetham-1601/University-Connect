@@ -1,128 +1,256 @@
 "use client";
 import { useState, useEffect } from "react";
-import { useRouter } from "next/navigation";
-import { getUsers } from "@/utils/api";
+import { useRouter }       from "next/navigation";
+import Navbar              from "@/components/Navbar";
+import NotificationsDropdown from "@/components/NotificationsDropdown";
+
+import {
+  getChannels,
+  getUsers,
+  sendFollowRequest,
+  getPendingFollowRequests,
+  getAcceptedFollowRequests,
+  acceptFollowRequest,
+  rejectFollowRequest,
+} from "@/utils/api";
 
 export default function ExplorePage() {
-  const [channels, setChannels] = useState([]);
-  const [people, setPeople] = useState([]);
-  const [error, setError] = useState("");
-  const [searchQuery, setSearchQuery] = useState("");
   const router = useRouter();
 
+  //  Data
+  const [channels,    setChannels]    = useState([]);
+  const [allUsers,    setAllUsers]    = useState([]);
+  const [currentUser, setCurrentUser] = useState(null);
+  const [loading,     setLoading]     = useState(true);
+
+  // Connection state
+  const [incoming, setIncoming] = useState([]);  // pending TO me
+  const [accepted, setAccepted] = useState([]);  // connected user IDs
+  const [outgoing, setOutgoing] = useState([]);  // pending FROM me
+
+  const [search, setSearch] = useState("");
+
+  // ─── 1) Load outgoing from localStorage on client only ───
   useEffect(() => {
-    // For this MVP, channels are hard-coded.
-    setChannels([
-      {
-        id: 1,
-        name: "University Tour",
-        description: "Top Featured – Explore campus history and traditions."
-      },
-      {
-        id: 2,
-        name: "Startup Discussions",
-        description: "Meet your co-founder and share startup ideas."
-      },
-      {
-        id: 3,
-        name: "Multi Domain Connect",
-        description: "Connect across fields – Computers, Doctors, Students."
-      },
-      {
-        id: 4,
-        name: "International Student Connect",
-        description: "Network and learn with fellow international students."
-      }
-    ]);
-    // Fetch people using the existing getUsers API.
-    getUsers()
-      .then((data) => {
-        if (!data.error) {
-          setPeople(data.users);
-        } else {
-          setError(data.error);
-        }
-      })
-      .catch((err) => setError(err.message));
+    if (typeof window !== "undefined") {
+      const saved = JSON.parse(localStorage.getItem("pendingOutgoing") || "[]");
+      setOutgoing(saved);
+    }
   }, []);
 
-  // Filter channels and people by search query (if needed).
-  const filteredChannels = channels.filter((channel) =>
-    channel.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    channel.description.toLowerCase().includes(searchQuery.toLowerCase())
+  // ─── 2) Load my profile, channels & users ───
+  useEffect(() => {
+    const token = localStorage.getItem("token");
+    if (!token) return router.push("/login");
+
+    // Load current user
+    fetch(`http://localhost:5000/api/profile?token=${token}`)
+      .then((r) => r.json())
+      .then((d) => setCurrentUser(d.user))
+      .catch(() => router.push("/login"));
+
+    // Load channels + people
+    Promise.all([getChannels(), getUsers()])
+      .then(([cRes, uRes]) => {
+        setChannels(cRes.channels || []);
+        setAllUsers(uRes.users || []);
+      })
+      .finally(() => setLoading(false));
+  }, [router]);
+
+  // ─── 3) Once we know “me”, fetch incoming + accepted ───
+  useEffect(() => {
+    if (!currentUser) return;
+
+    getPendingFollowRequests(currentUser.id)
+      .then((res) => setIncoming(res.pending || []))
+      .catch(console.error);
+
+    getAcceptedFollowRequests(currentUser.id)
+      .then((res) => setAccepted(res.accepted || []))
+      .catch(console.error);
+  }, [currentUser]);
+
+  // ─── 4) Persist outgoing whenever it changes ───
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      localStorage.setItem("pendingOutgoing", JSON.stringify(outgoing));
+    }
+  }, [outgoing]);
+
+  // ─── Handlers ───
+  const handleFollow = async (userId) => {
+    await sendFollowRequest({
+      requester_id: currentUser.id,
+      target_id: userId,
+    });
+    setOutgoing((o) => [...o, userId]);
+  };
+
+  const handleAccept = async (reqId, requesterId) => {
+    await acceptFollowRequest({
+      requestId: reqId,
+      user_id: currentUser.id,
+    });
+    setAccepted((a) => [...a, requesterId]);
+    setIncoming((i) => i.filter((r) => r.id !== reqId));
+  };
+
+  const handleReject = async (reqId) => {
+    await rejectFollowRequest({ requestId: reqId });
+    setIncoming((i) => i.filter((r) => r.id !== reqId));
+  };
+
+  const handleJoinChannel = (ch) => {
+    const joined = JSON.parse(localStorage.getItem("joinedChannels") || "[]");
+    localStorage.setItem(
+      "joinedChannels",
+      JSON.stringify([...joined, ch.id])
+    );
+    router.push("/channels");
+  };
+
+  if (loading) return <div className="p-6">Loading…</div>;
+
+  // ─── Filters (only search) ───
+  const filteredChannels = channels.filter((c) =>
+    c.name.toLowerCase().includes(search.toLowerCase())
   );
-  const filteredPeople = people.filter((person) =>
-    person.email.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+
+  const filteredPeople = allUsers
+    .filter((u) => {
+      // exclude myself if known
+      if (currentUser && u.id === currentUser.id) return false;
+      return u.email.toLowerCase().includes(search.toLowerCase());
+    });
 
   return (
-    <div className="min-h-screen bg-gray-50 p-4">
-      <h1 className="text-3xl font-bold mb-6">Explore Groups &amp; People</h1>
+    <div className="flex h-screen">
+      <Navbar />
+      <div className="flex-1 bg-gray-50 p-4 overflow-auto">
+        {/* Header */}
+        <header
+          className="flex items-center justify-between mb-6 p-4"
+          style={{
+            background: "linear-gradient(to bottom right, #3192A5, #296485)",
+          }}
+        >
+          <h1 className="text-3xl font-bold text-white">
+            Explore Groups & People
+          </h1>
+          {currentUser && (
+            <NotificationsDropdown currentUserId={currentUser.id} />
+          )}
+        </header>
 
-      {/* Search Bar */}
-      <div className="mb-6">
+        {/* Search */}
         <input
           type="text"
           placeholder="Search..."
-          className="w-full p-2 border rounded"
-          value={searchQuery}
-          onChange={(e) => setSearchQuery(e.target.value)}
+          className="w-full p-2 mb-6 border rounded"
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
         />
-      </div>
 
-      {error && <p className="text-red-500 mb-4">{error}</p>}
-
-      {/* Groups Section */}
-      <section className="mb-8">
-        <h2 className="text-2xl font-semibold mb-4">Groups</h2>
-        {filteredChannels.length === 0 ? (
-          <p className="text-gray-600">No groups available.</p>
-        ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {filteredChannels.map((channel) => (
-              <div
-                key={channel.id}
-                className="bg-white p-4 rounded shadow hover:shadow-md cursor-pointer transition-all"
-                onClick={() => router.push(`/channels/${channel.id}`)}
-              >
-                <h3 className="text-xl font-bold mb-2">{channel.name}</h3>
-                <p className="text-gray-700">{channel.description || "No description provided."}</p>
-                <button className="mt-4 bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600">
-                  Join
-                </button>
-              </div>
-            ))}
-          </div>
-        )}
-      </section>
-
-      {/* People Section */}
-      <section>
-        <h2 className="text-2xl font-semibold mb-4">People</h2>
-        {filteredPeople.length === 0 ? (
-          <p className="text-gray-600">No people to explore.</p>
-        ) : (
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-            {filteredPeople.map((person) => (
-              <div
-                key={person.id}
-                className="bg-white p-4 rounded shadow flex flex-col items-center hover:shadow-md cursor-pointer transition-all"
-                onClick={() => router.push(`/profile/${person.id}`)}
-              >
-                <div className="w-16 h-16 bg-blue-200 rounded-full flex items-center justify-center mb-2">
-                  <span className="text-2xl font-bold text-blue-700">
-                    {person.email.charAt(0).toUpperCase()}
-                  </span>
+        {/* Channels */}
+        <section className="mb-8">
+          <h2 className="text-2xl font-semibold mb-4">Channels</h2>
+          {filteredChannels.length === 0 ? (
+            <p className="text-gray-600">No channels available.</p>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {filteredChannels.map((ch) => (
+                <div
+                  key={ch.id}
+                  className="bg-white p-4 rounded shadow flex justify-between items-center"
+                >
+                  <span className="font-bold">{ch.name}</span>
+                  <button
+                    onClick={() => handleJoinChannel(ch)}
+                    className="bg-blue-500 text-white px-4 py-2 rounded"
+                  >
+                    Join
+                  </button>
                 </div>
-                <p className="font-semibold text-center">{person.email}</p>
-                <button className="mt-2 bg-green-500 text-white px-3 py-1 rounded hover:bg-green-600">
-                  Follow
-                </button>
-              </div>
-            ))}
-          </div>
-        )}
-      </section>
+              ))}
+            </div>
+          )}
+        </section>
+
+        {/* People */}
+        <section>
+          <h2 className="text-2xl font-semibold mb-4">People</h2>
+          {filteredPeople.length === 0 ? (
+            <p className="text-gray-600">No people to explore.</p>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+              {filteredPeople.map((person) => {
+                const inc = incoming.find((r) => r.requester_id === person.id);
+                const out = outgoing.includes(person.id);
+                const acc = accepted.includes(person.id);
+
+                let button;
+                if (inc) {
+                  button = (
+                    <div className="flex space-x-2">
+                      <button
+                        onClick={() => handleAccept(inc.id, person.id)}
+                        className="bg-green-500 text-white px-3 py-1 rounded"
+                      >
+                        Accept
+                      </button>
+                      <button
+                        onClick={() => handleReject(inc.id)}
+                        className="bg-red-500 text-white px-3 py-1 rounded"
+                      >
+                        Reject
+                      </button>
+                    </div>
+                  );
+                } else if (acc) {
+                  button = (
+                    <button className="bg-gray-400 text-white px-3 py-1 rounded">
+                      Connected
+                    </button>
+                  );
+                } else if (out) {
+                  button = (
+                    <button className="bg-gray-400 text-white px-3 py-1 rounded">
+                      Requested
+                    </button>
+                  );
+                } else {
+                  button = (
+                    <button
+                      onClick={() => handleFollow(person.id)}
+                      className="bg-blue-500 text-white px-3 py-1 rounded"
+                    >
+                      Follow
+                    </button>
+                  );
+                }
+
+                return (
+                  <div
+                    key={person.id}
+                    className="bg-white p-4 rounded shadow flex flex-col items-center"
+                  >
+                    <div className="w-16 h-16 bg-blue-200 rounded-full flex items-center justify-center mb-2">
+                      <span className="text-2xl text-blue-700">
+                        {person.email.charAt(0).toUpperCase()}
+                      </span>
+                    </div>
+                    <p className="font-semibold mb-2 text-center">
+                      {person.email}
+                    </p>
+                    {button}
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </section>
+      </div>
     </div>
   );
 }

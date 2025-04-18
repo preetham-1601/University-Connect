@@ -1,4 +1,4 @@
-const API_URL = process.env.NEXT_PUBLIC_API_URL;
+const API_URL = "http://localhost:5000/api";
 
 // SIGNUP
 export const signup = async ({ email, password, confirmPassword }) => {
@@ -86,6 +86,45 @@ export const sendChannelMessage = async ({ channel_id, sender_id, content }) => 
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ channel_id, sender_id, content })
+  });
+  return res.json();
+};
+
+
+// — Follow / Connection requests —
+export const sendFollowRequest = async ({ requester_id, target_id }) => {
+  const res = await fetch(`${API_URL}/follows`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ requester_id, target_id }),
+  });
+  return res.json();
+};
+
+export const getPendingFollowRequests = async (userId) => {
+  const res = await fetch(`${API_URL}/follows/pending?user_id=${userId}`);
+  return res.json();
+};
+
+export const getAcceptedFollowRequests = async (userId) => {
+  const res = await fetch(`${API_URL}/follows/accepted?user_id=${userId}`);
+  return res.json();
+};
+
+export const acceptFollowRequest = async ({ requestId, user_id }) => {
+  const res = await fetch(`${API_URL}/follows/accept`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ requestId, user_id }),
+  });
+  return res.json();
+};
+
+export const rejectFollowRequest = async ({ requestId }) => {
+  const res = await fetch(`${API_URL}/follows/reject`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ requestId }),
   });
   return res.json();
 };

@@ -1,51 +1,49 @@
 "use client";
-import React, { useEffect, useState } from "react";
+import React, { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { getChannels, getChannelMessages, sendChannelMessage, getUsers, getProfile } from "@/utils/api";
+import {
+  getChannels,
+  getChannelMessages,
+  sendChannelMessage,
+} from "@/utils/api";
 import { supabase } from "@/utils/supabaseClient";
 import Navbar from "@/components/Navbar";
 
 export default function ChannelsPage() {
   const router = useRouter();
 
-  // State for current user and all users (for sender lookup)
+  // State for global/current user (assumed to be stored in localStorage)
   const [currentUser, setCurrentUser] = useState(null);
-  const [allUsers, setAllUsers] = useState([]);
-
-  // Channels list state and selected channel
+  // State for full channels list from the backend.
   const [channels, setChannels] = useState([]);
+  // State for the joined channels (an array of channel IDs stored in localStorage)
+  const [joinedChannels, setJoinedChannels] = useState([]);
+  // State for the currently selected (joined) channel.
   const [selectedChannel, setSelectedChannel] = useState(null);
-
-  // Channel messages and chat input state
+  // Channel chat messages.
   const [channelMessages, setChannelMessages] = useState([]);
+  // Message input text.
   const [chatInput, setChatInput] = useState("");
+  // General error message.
   const [error, setError] = useState("");
 
-  // On mount, fetch current user, users, and channels.
+  // On mount, load the current user from localStorage.
   useEffect(() => {
-    const token = localStorage.getItem("token");
-    if (!token) {
-      router.push("/login");
-      return;
+    if (typeof window !== "undefined") {
+      const storedUser = localStorage.getItem("currentUser");
+      if (storedUser) {
+        setCurrentUser(JSON.parse(storedUser));
+      }
+      // Load joined channels from localStorage (as an array of channel IDs).
+      const storedJoined = localStorage.getItem("joinedChannels");
+      if (storedJoined) {
+        setJoinedChannels(JSON.parse(storedJoined));
+      }
     }
+  }, []);
 
-    // Fetch current user's profile
-    fetch(`http://localhost:5000/api/profile?token=${token}`)
-      .then((res) => res.json())
-      .then((data) => {
-        if (data.user) setCurrentUser(data.user);
-      })
-      .catch((err) => console.error("Error fetching profile:", err));
-
-    // Fetch all users (for looking up sender emails)
-    getUsers()
-      .then((data) => {
-        if (!data.error) setAllUsers(data.users);
-        else console.error("Error fetching users:", data.error);
-      })
-      .catch((err) => console.error("Error fetching users:", err));
-
-    // Fetch channels list
+  // Fetch all channels from the backend.
+  useEffect(() => {
     getChannels()
       .then((data) => {
         if (data.channels) {
@@ -55,9 +53,14 @@ export default function ChannelsPage() {
         }
       })
       .catch((err) => setError(err.message));
-  }, [router]);
+  }, []);
 
-  // When a channel is selected, load historical messages for it.
+  // Filter channels to display only those that the user has joined.
+  const joinedChannelsList = channels.filter((channel) =>
+    joinedChannels.includes(channel.id)
+  );
+
+  // When a joined channel is selected, load its messages.
   useEffect(() => {
     if (selectedChannel) {
       getChannelMessages(selectedChannel.id)
@@ -72,7 +75,7 @@ export default function ChannelsPage() {
     }
   }, [selectedChannel]);
 
-  // Setup realtime subscription for channel messages.
+  // Realtime subscription for channel messages.
   useEffect(() => {
     if (!selectedChannel) return;
     const subscription = supabase
@@ -83,7 +86,7 @@ export default function ChannelsPage() {
           event: "INSERT",
           schema: "public",
           table: "channel_messages",
-          filter: `channel_id=eq.${selectedChannel.id}`
+          filter: `channel_id=eq.${selectedChannel.id}`,
         },
         (payload) => {
           const newMessage = payload.new;
@@ -91,19 +94,18 @@ export default function ChannelsPage() {
         }
       )
       .subscribe();
-
     return () => {
       supabase.removeChannel(subscription);
     };
   }, [selectedChannel]);
 
-  // Handle sending a new channel message.
+  // Handler for sending a channel message.
   async function handleSend() {
     if (!chatInput.trim() || !selectedChannel || !currentUser) return;
     const contentToSend = chatInput;
     setChatInput("");
 
-    // Optimistically update UI with a temporary message.
+    // Optimistic update.
     const tempMessage = {
       id: `temp-${Date.now()}`,
       channel_id: selectedChannel.id,
@@ -113,51 +115,61 @@ export default function ChannelsPage() {
     };
     setChannelMessages((prev) => [...prev, tempMessage]);
 
-    // Send message via API.
     const res = await sendChannelMessage({
       channel_id: selectedChannel.id,
       sender_id: currentUser.id,
       content: contentToSend,
     });
     if (res.error) {
-      setChannelMessages((prev) => prev.filter((msg) => msg.id !== tempMessage.id));
+      setChannelMessages((prev) =>
+        prev.filter((msg) => msg.id !== tempMessage.id)
+      );
       alert("Error sending message: " + res.error);
     }
   }
 
+  // Optionally, allow user to navigate to a page where they join a channel.
+  // For now, assume the Explore page’s "Join" button already stores channel IDs in localStorage.
+  // On this page, we display only channels whose IDs are in joinedChannels.
+  
   return (
     <div className="flex h-screen">
-      {/* LEFT: Global Navbar */}
+      {/* Left Column: Global Navbar */}
       <Navbar />
-
-      {/* MIDDLE: Channels List */}
+      
+      {/* Middle Column: Joined Channels List */}
       <div className="w-64 bg-gray-100 p-4 border-r border-gray-300 overflow-y-auto">
-        <h2 className="text-lg font-bold mb-4 text-gray-800">Channels</h2>
-        {channels.map((channel) => (
-          <div
-            key={channel.id}
-            onClick={() => {
-              setSelectedChannel(channel);
-              setChannelMessages([]); // Clear messages when switching channels.
-            }}
-            className={`p-2 mb-2 rounded cursor-pointer transition-colors hover:bg-gray-200 ${
-              selectedChannel?.id === channel.id ? "bg-gray-300" : "bg-white"
-            }`}
-          >
-            <span className="font-semibold text-gray-900"># {channel.name}</span>
-          </div>
-        ))}
-        {channels.length === 0 && (
-          <p className="mt-4 text-sm text-gray-600">No channels available.</p>
+        <h2 className="text-lg font-bold mb-4 text-gray-800">Joined Channels</h2>
+        {joinedChannelsList.length === 0 ? (
+          <p className="text-gray-600 text-sm">
+            You havent joined any channels. Go to Explore to join one.
+          </p>
+        ) : (
+          joinedChannelsList.map((channel) => (
+            <div
+              key={channel.id}
+              onClick={() => {
+                setSelectedChannel(channel);
+                setChannelMessages([]); // clear previous channel messages
+              }}
+              className={`p-2 mb-2 rounded cursor-pointer transition-colors hover:bg-gray-200 ${
+                selectedChannel?.id === channel.id ? "bg-gray-300" : "bg-white"
+              }`}
+            >
+              <span className="font-semibold text-gray-900"># {channel.name}</span>
+            </div>
+          ))
         )}
       </div>
-
-      {/* RIGHT: Channel Chat Area */}
+      
+      {/* Right Column: Channel Chat Area */}
       <div className="flex-1 flex flex-col">
-        {/* Top Bar with matching gradient */}
+        {/* Top Bar with same gradient as Navbar */}
         <header
           className="h-14 flex items-center px-4"
-          style={{ background: "linear-gradient(to bottom right, #3192A5, #296485)" }}
+          style={{
+            background: "linear-gradient(to bottom right, #3192A5, #296485)",
+          }}
         >
           {selectedChannel ? (
             <h1 className="text-xl font-bold text-white">#{selectedChannel.name}</h1>
@@ -165,8 +177,8 @@ export default function ChannelsPage() {
             <h1 className="text-xl font-bold text-white">Select a channel</h1>
           )}
         </header>
-
-        {/* Messages Area */}
+        
+        {/* Chat Messages */}
         <div className="flex-1 p-4 overflow-y-auto space-y-2 bg-blue-50">
           {selectedChannel ? (
             channelMessages.length === 0 ? (
@@ -175,14 +187,13 @@ export default function ChannelsPage() {
               channelMessages.map((msg) => {
                 // Determine if the message is from current user.
                 const isCurrentUser = msg.sender_id === currentUser?.id;
-                // Look up the sender's email for other messages.
-                const sender = allUsers.find((u) => u.id === msg.sender_id);
                 return (
                   <div key={msg.id} className={`flex ${isCurrentUser ? "justify-end" : "justify-start"}`}>
                     <div className="max-w-xs">
                       {!isCurrentUser && (
                         <div className="text-xs text-gray-600 mb-1">
-                          {sender ? sender.email : "Unknown"}
+                          {/* Optionally, you could look up the sender's email if available */}
+                          {msg.sender_id}
                         </div>
                       )}
                       <div
@@ -203,8 +214,8 @@ export default function ChannelsPage() {
             <p className="text-gray-600">Select a channel from the list.</p>
           )}
         </div>
-
-        {/* Input Area */}
+        
+        {/* Message Input */}
         <div className="h-14 flex items-center px-4 bg-white border-t">
           <input
             type="text"
