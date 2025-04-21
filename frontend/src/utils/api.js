@@ -26,15 +26,16 @@ export const getProfile = async (token) => {
   return res.json();
 };
 
-// UPDATE PROFILE
-export const updateProfile = async ({ token, fullName, avatarURL }) => {
+// UPSERT PROFILE
+export const upsertProfile = async ({ token, fullName, avatarURL, bannerURL, bio, interests }) => {
   const res = await fetch(`${API_URL}/profile`, {
     method: "PUT",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ token, fullName, avatarURL })
+    body: JSON.stringify({ token, fullName, avatarURL, bannerURL, bio, interests })
   });
   return res.json();
 };
+
 
 // GET ALL USERS (profiles)
 export const getUsers = async () => {
