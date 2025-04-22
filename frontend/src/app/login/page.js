@@ -1,13 +1,15 @@
+// frontend/src/app/login/page.js
 "use client";
+
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { login } from "@/utils/api";
+import { login, getProfile } from "@/utils/api";
 
 export default function LoginPage() {
   const router = useRouter();
-  const [email, setEmail] = useState("");
+  const [email, setEmail]     = useState("");
   const [password, setPassword] = useState("");
-  const [error, setError] = useState("");
+  const [error, setError]     = useState("");
 
   function isEduEmail(email) {
     return email.endsWith(".edu");
@@ -16,21 +18,40 @@ export default function LoginPage() {
   async function handleLogin(e) {
     e.preventDefault();
     setError("");
+
     if (!isEduEmail(email)) {
       setError("Only .edu emails allowed");
       return;
     }
+
+    // 1) Authenticate
     const data = await login({ email, password });
     if (data.error) {
       setError(data.error);
-    } else {
-      localStorage.setItem("token", data.token);
-      const onboarded = data.user?.user_metadata?.onboarded;
-      if (!onboarded) {
-        router.push("/onboarding");
-      } else {
+      return;
+    }
+
+    // 2) Persist token & email
+    localStorage.setItem("token", data.token);
+    localStorage.setItem("email", email);
+
+    try {
+      // 3) Fetch your profile row (which includes onboarding_completed)
+      const profileRes = await getProfile(data.token);
+      if (profileRes.error) {
+        // If we can’t get a profile, just land in home
         router.push("/home");
+      } else {
+        const completed = profileRes.profile?.onboarding_completed;
+        if (completed) {
+          router.push("/home");
+        } else {
+          router.push("/onboarding");
+        }
       }
+    } catch (err) {
+      console.error("Profile fetch error:", err);
+      router.push("/home");
     }
   }
 
@@ -58,10 +79,12 @@ export default function LoginPage() {
             value={password}
             onChange={(e) => setPassword(e.target.value)}
           />
-          <button className="w-full bg-blue-500 text-white py-2 rounded mb-2">Login</button>
+          <button type="submit" className="w-full bg-[#3192A5] text-white py-2 rounded hover:bg-[#297485] mb-2">
+            Login
+          </button>
           <p className="text-sm text-center">
             Don’t have an account?{" "}
-            <span onClick={() => router.push("/signup")} className="text-blue-500 cursor-pointer">
+            <span onClick={() => router.push("/signup")} className="text-[#3192A5] cursor-pointer">
               Sign up
             </span>
           </p>

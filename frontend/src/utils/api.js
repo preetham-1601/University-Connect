@@ -27,11 +27,11 @@ export const getProfile = async (token) => {
 };
 
 // UPSERT PROFILE
-export const upsertProfile = async ({ token, fullName, avatarURL, bannerURL, bio, interests }) => {
+export const upsertProfile = async (payload) => {
   const res = await fetch(`${API_URL}/profile`, {
     method: "PUT",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ token, fullName, avatarURL, bannerURL, bio, interests })
+    body: JSON.stringify(payload),
   });
   return res.json();
 };
