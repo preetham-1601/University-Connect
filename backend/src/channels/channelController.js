@@ -1,6 +1,28 @@
 // backend/src/channels/channelController.js
 const supabase = require("../supabaseClient");
 
+
+// add at top
+exports.getJoinedChannels = async (req, res) => {
+  const { userId } = req.params;
+  const { data, error } = await supabase
+    .from("channel_members")
+    .select("channel_id")
+    .eq("user_id", userId);
+  if (error) return res.status(500).json({ error: error.message });
+  return res.json({ joined: data.map(r => r.channel_id) });
+};
+
+exports.joinChannel = async (req, res) => {
+  const { id }    = req.params;       // channel_id
+  const { userId } = req.body;        // from client
+  const { data, error } = await supabase
+    .from("channel_members")
+    .insert([{ channel_id: id, user_id: userId }], { returning: "representation" });
+  if (error) return res.status(400).json({ error: error.message });
+  return res.json({ joined: true });
+};
+
 // Retrieve all channels.
 exports.getChannels = async (req, res) => {
   const { data, error } = await supabase

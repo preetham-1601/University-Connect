@@ -59,6 +59,19 @@ export const sendMessage = async ({ sender_id, receiver_id, content }) => {
   });
   return res.json();
 };
+// new Channels:
+export const getJoinedChannels = async (userId) => {
+  const res = await fetch(`${API_URL}/channels/joined/${userId}`);
+  return res.json();          // { joined: [1,2,3] }
+};
+export const joinChannel = async ({ channelId, userId }) => {
+  const res = await fetch(`${API_URL}/channels/${channelId}/join`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ userId }),
+  });
+  return res.json();
+};
 
 // GET ALL CHANNELS
 export const getChannels = async () => {

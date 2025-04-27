@@ -6,6 +6,8 @@ import NotificationsDropdown from "@/components/NotificationsDropdown";
 
 import {
   getChannels,
+  joinChannel,
+  getJoinedChannels,
   getUsers,
   sendFollowRequest,
   getPendingFollowRequests,
@@ -19,6 +21,7 @@ export default function ExplorePage() {
 
   //  Data
   const [channels,    setChannels]    = useState([]);
+  const [joinedIds, setJoinedIds] = useState([]);
   const [allUsers,    setAllUsers]    = useState([]);
   const [currentUser, setCurrentUser] = useState(null);
   const [loading,     setLoading]     = useState(true);
@@ -57,6 +60,22 @@ export default function ExplorePage() {
       })
       .finally(() => setLoading(false));
   }, [router]);
+
+  useEffect(() => {
+    if (!currentUser) return;
+    getJoinedChannels(currentUser.id)
+      .then(d => setJoinedIds(d.joined || []));
+  }, [currentUser]);
+
+  const handleJoinChannel = (ch) => {
+    joinChannel({ channelId: ch.id, userId: currentUser.id })
+    .then(() => {
+      setJoinedIds(ids => [...ids, ch.id]);
+      // redirect into that channel’s chat page
+      router.push(`/channels/${ch.id}`);
+    })
+    .catch(console.error);
+  };
 
   // ─── 3) Once we know “me”, fetch incoming + accepted ───
   useEffect(() => {
@@ -101,14 +120,6 @@ export default function ExplorePage() {
     setIncoming((i) => i.filter((r) => r.id !== reqId));
   };
 
-  const handleJoinChannel = (ch) => {
-    const joined = JSON.parse(localStorage.getItem("joinedChannels") || "[]");
-    localStorage.setItem(
-      "joinedChannels",
-      JSON.stringify([...joined, ch.id])
-    );
-    router.push("/channels");
-  };
 
   if (loading) return <div className="p-6">Loading…</div>;
 
@@ -159,20 +170,21 @@ export default function ExplorePage() {
             <p className="text-gray-600">No channels available.</p>
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {filteredChannels.map((ch) => (
-                <div
-                  key={ch.id}
-                  className="bg-white p-4 rounded shadow flex justify-between items-center"
-                >
-                  <span className="font-bold">{ch.name}</span>
-                  <button
-                    onClick={() => handleJoinChannel(ch)}
-                    className="bg-blue-500 text-white px-4 py-2 rounded"
-                  >
-                    Join
-                  </button>
-                </div>
-              ))}
+              {filteredChannels.map(ch => {
+                const joined = joinedIds.includes(ch.id);
+                return (
+                  <div key={ch.id} className="p-4 bg-white rounded shadow flex justify-between items-center">
+                    <span>{ch.name}</span>
+                    <button
+                      onClick={() => handleJoinChannel(ch)}
+                      disabled={joined}
+                      className={joined ? "bg-gray-400 text-white px-3 py-1 rounded" : "bg-blue-500 px-3 py-1 rounded text-white"}
+                    >
+                      {joined ? "Joined" : "Join"}
+                    </button>
+                  </div>
+               );
+             })}
             </div>
           )}
         </section>

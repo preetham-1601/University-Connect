@@ -18,7 +18,8 @@ export default function Navbar() {
   ];
 
   // Determine if an icon should be enlarged based on matching the current path.
-  const isActive = (route) => pathname === route;
+  const isActive = (route) =>
+       pathname === route || pathname.startsWith(`${route}/`);
 
   return (
     <div
