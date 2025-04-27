@@ -1,4 +1,5 @@
-const API_URL = "http://localhost:5000/api";
+// after — pulls from Vercel or your .env.local
+const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000/api";
 
 // SIGNUP
 export const signup = async ({ email, password, confirmPassword }) => {
