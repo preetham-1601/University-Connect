@@ -47,7 +47,7 @@ export default function ExplorePage() {
     if (!token) return router.push("/login");
 
     // Load current user
-    fetch(`http://localhost:5000/api/profile?token=${token}`)
+    fetch(`${process.env.NEXT_PUBLIC_API_URL}/profile?token=${token}`)
       .then((r) => r.json())
       .then((d) => setCurrentUser(d.user))
       .catch(() => router.push("/login"));
