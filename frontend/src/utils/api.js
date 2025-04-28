@@ -1,5 +1,5 @@
 // after — pulls from Vercel or your .env.local
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "https://university-connect-backend.onrender.com";
+const API_URL = process.env.NEXT_PUBLIC_API || "https://university-connect-backend.onrender.com";
 
 // SIGNUP
 export const signup = async ({ email, password, confirmPassword }) => {
