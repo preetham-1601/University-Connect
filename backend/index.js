@@ -24,5 +24,5 @@ app.use("/api/users", userRoutes);
 app.use("/api/channels", channelRoutes);
 app.use("/api/follows", followRoutes);
 
-const PORT = process.env.PORT || 5000;
+const PORT = process.env.PORT || 10000;
 app.listen(PORT, () => console.log(`Backend running on port ${PORT}`));
